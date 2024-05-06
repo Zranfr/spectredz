@@ -54,19 +54,19 @@ func AstroBWTv3Hash(hashIn *externalapi.DomainHash) *externalapi.DomainHash {
 // CalculateProofOfWorkValue hashes the internal header and returns its big.Int value
 func (state *State) CalculateProofOfWorkValue() *big.Int {
 	// PRE_POW_HASH || TIME || 32 zero byte padding || NONCE
-	writer := hashes.NewPoWHashWriter()
-	writer.InfallibleWrite(state.prePowHash.ByteSlice())
-	err := serialization.WriteElement(writer, state.Timestamp)
-	if err != nil {
-		panic(errors.Wrap(err, "this should never happen. Hash digest should never return an error"))
+	var buf bytes.Buffer
+	buf.Write(state.prePowHash.ByteSlice())
+	
+	if err := serialization.WriteElement(&buf, state.Timestamp); err != nil {
+	log.Fatalf("Error while writing timestamp: %v", err)
 	}
-	zeroes := [32]byte{}
-	writer.InfallibleWrite(zeroes[:])
-	err = serialization.WriteElement(writer, state.Nonce)
-	if err != nil {
-		panic(errors.Wrap(err, "this should never happen. Hash digest should never return an error"))
+	buf.Write(make([]byte, 32)) // Zero padding
+	
+	if err := serialization.WriteElement(&buf, state.Nonce); err != nil {
+	log.Fatalf("Error while writing nonce: %v", err)
 	}
-	powHash := writer.Finalize()
+	
+	powHash := hashes.NewPoWHash(buf.Bytes()).Finalize()
 	bwtHash := AstroBWTv3Hash(powHash)
 	heavyHash := state.mat.HeavyHash(bwtHash)
 	return toBig(heavyHash)
